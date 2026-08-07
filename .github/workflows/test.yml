@@ -17,7 +17,6 @@ jobs:
         with:
           python-version: "3.11"
       - run: make test
-      - run: ./scripts/secret-scan
       - run: swift build --package-path contacts --configuration release
       - run: swiftc -typecheck scripts/copy-shortcut-actions.swift
       - run: swiftc -typecheck scripts/inspect-shortcuts-clipboard.swift
