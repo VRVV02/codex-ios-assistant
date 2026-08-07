@@ -56,7 +56,14 @@ brew install cloudflared steipete/tap/imsg
 
 Configuration has three values: the iMessage address that reaches your iPhone, a stable HTTPS hostname such as `https://iphone.example.com`, and a generated receiver token. The installer stores them in `~/.config/codex-ios-assistant/`, outside the repository.
 
-`scripts/copy-shortcut` puts 95 native Shortcuts actions on the Mac clipboard. Paste them once into a blank shortcut, then create the Message automation on the iPhone. Follow the [installation guide](docs/installation.md) for those manual steps and the required Apple permissions.
+`scripts/copy-shortcut` puts 95 native Shortcuts actions on the Mac clipboard. Paste them once into a blank shortcut and name it `iOS Assistant`. After iCloud syncs it to your iPhone, create the automation that listens for commands:
+
+1. Open Shortcuts > Automation, tap the plus sign at the bottom, then choose New Automation > Message.
+2. Under `When I receive a message where`, set `Sender is` to your own iMessage contact.
+3. Tap `Add Filter` and set `Message contains` to `hola`.
+4. Tap `Run Shortcut` and select `iOS Assistant`.
+
+You must create this automation by hand in the Shortcuts app on your iPhone. Follow the [installation guide](docs/installation.md) for the remaining Apple permissions.
 
 ## Test the setup
 

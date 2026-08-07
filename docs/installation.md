@@ -129,13 +129,15 @@ Confirm Shortcuts sync under System Settings > Apple Account > iCloud. The Short
 
 Personal automations belong to one device, so create this part on the iPhone:
 
-1. Open Shortcuts > Automation.
-2. Tap `+` and choose the Message trigger.
-3. Set `Message Contains` to `hola`.
-4. Restrict `Sender` to the identity used by the Mac when iOS offers that identity.
+1. Open Shortcuts > Automation and tap the plus sign at the bottom.
+2. Choose New Automation > Message.
+3. Under `When I receive a message where`, set `Sender is` to your own iMessage contact.
+4. Tap `Add Filter` and set `Message contains` to `hola`.
 5. Choose `Run Immediately` and turn off any confirmation prompt.
-6. Add `Run Shortcut` and select `iOS Assistant`.
+6. Tap `Run Shortcut` and select `iOS Assistant`.
 7. Save the automation.
+
+You must create this automation by hand in the Shortcuts app on the iPhone. It does not sync from the Mac with the Shortcut.
 
 Apple describes the relevant setting in [Enable or disable a personal automation](https://support.apple.com/guide/shortcuts/enable-or-disable-a-personal-automation-apd602971e63/ios).
 
