@@ -1,0 +1,15 @@
+#!/bin/zsh
+set -euo pipefail
+
+readonly repo_dir="${0:A:h:h}"
+readonly python_bin="$repo_dir/.venv/bin/python"
+
+if [[ ! -x "$python_bin" ]]; then
+  print -u2 "Run ./scripts/install first."
+  exit 1
+fi
+
+actions="$($python_bin "$repo_dir/scripts/render-shortcut.py")"
+/usr/bin/swift "$repo_dir/scripts/copy-shortcut-actions.swift" "$actions"
+print "Open Shortcuts on this Mac, create a blank shortcut, click its action canvas,"
+print "and press Command-V once. Name it iOS Assistant and let iCloud sync it."

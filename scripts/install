@@ -1,0 +1,52 @@
+#!/bin/zsh
+set -euo pipefail
+
+readonly repo_dir="${0:A:h:h}"
+readonly python_bin="${PYTHON:-$(command -v python3)}"
+readonly local_bin="$HOME/.local/bin"
+readonly user_skills="$HOME/.agents/skills"
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  print -u2 "codex-ios-assistant requires macOS."
+  exit 1
+fi
+
+"$python_bin" - <<'PY'
+import sys
+if sys.version_info < (3, 11):
+    raise SystemExit("Python 3.11 or newer is required.")
+PY
+
+"$python_bin" -m venv "$repo_dir/.venv"
+"$repo_dir/.venv/bin/python" -m pip install --quiet --upgrade pip
+"$repo_dir/.venv/bin/python" -m pip install --quiet --editable "$repo_dir"
+
+mkdir -p "$local_bin" "$user_skills"
+ln -sfn "$repo_dir/.venv/bin/iphone" "$local_bin/iphone"
+ln -sfn "$repo_dir/skills/iphone-control" "$user_skills/iphone-control"
+
+if command -v swift >/dev/null 2>&1; then
+  if swift build --package-path "$repo_dir/contacts" --configuration release; then
+    cp "$repo_dir/contacts/.build/release/contacts" "$local_bin/contacts"
+  else
+    print -u2 "warning: Contacts helper build failed; the core iPhone bridge is still installed."
+    print -u2 "Accept the Xcode license or repair Swift, then rerun this installer."
+  fi
+else
+  print -u2 "warning: Swift is unavailable; friendly Contacts lookup was not installed."
+  print -u2 "Install Xcode Command Line Tools with: xcode-select --install"
+fi
+
+if [[ ! -f "$HOME/.config/codex-ios-assistant/config.env" ]]; then
+  "$repo_dir/scripts/configure"
+fi
+
+print "Installed iphone CLI: $local_bin/iphone"
+print "Installed Codex skill: $user_skills/iphone-control"
+if ! command -v cloudflared >/dev/null 2>&1; then
+  print "Next dependency: brew install cloudflared"
+fi
+if ! command -v imsg >/dev/null 2>&1; then
+  print "Optional Messages history: brew install steipete/tap/imsg"
+fi
+print "Next: run ./scripts/setup-cloudflare, make shortcut, and make services."

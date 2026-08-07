@@ -1,0 +1,4 @@
+interface:
+  display_name: "iPhone Control"
+  short_description: "Control and inspect your iPhone from Codex"
+  default_prompt: "Use $iphone-control to inspect or control my iPhone."

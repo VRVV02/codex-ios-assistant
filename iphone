@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+"""Run the project checkout without installing it first."""
+
+from pathlib import Path
+import sys
+
+
+project_root = Path(__file__).resolve().parent
+sys.path.insert(0, str(project_root / "src"))
+
+from iphone_cli.cli import main  # noqa: E402
+
+
+raise SystemExit(main())

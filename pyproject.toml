@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codex-ios-assistant"
+version = "0.1.0"
+description = "Control and inspect an iPhone from Codex through iMessage and Shortcuts"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "Sharif Shameem"}]
+keywords = ["codex", "ios", "iphone", "shortcuts", "imessage"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: MacOS X",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/samin100/codex-ios-assistant"
+Repository = "https://github.com/samin100/codex-ios-assistant"
+
+[project.scripts]
+iphone = "iphone_cli.cli:main"
+iphone-assistant-bridge = "iphone_cli.bridge:main"
+iphone-assistant-receiver = "iphone_cli.receiver:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

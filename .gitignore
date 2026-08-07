@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+inbox/
+*.log
+*.part
+config.env
+cloudflared.yml
