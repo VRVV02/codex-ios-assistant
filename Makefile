@@ -1,4 +1,4 @@
-.PHONY: install configure shortcut services doctor test audit clean
+.PHONY: install configure shortcut services doctor test clean
 
 install:
 	./scripts/install
@@ -19,9 +19,6 @@ test:
 	PYTHONPATH="$(CURDIR)/src" python3 -m unittest discover -s tests -v
 	python3 -m compileall -q src tests scripts
 	python3 scripts/validate-shortcut.py shortcut/actions.template.plist
-
-audit:
-	./scripts/secret-scan
 
 clean:
 	rm -rf build

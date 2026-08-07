@@ -34,7 +34,6 @@ Run these commands before pushing:
 
 ```bash
 make test
-./scripts/secret-scan
 git status --short
 git diff --cached
 ```

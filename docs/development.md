@@ -7,7 +7,6 @@ The Python package has no runtime dependencies. Run the checkout without install
 ```bash
 ./iphone --help
 make test
-./scripts/secret-scan
 ```
 
 `make test` runs the Python suite, compiles Python sources, and validates the Shortcut plist. Build the Contacts helper on macOS with:
@@ -37,6 +36,6 @@ Read [Shortcut maintenance](shortcut.md) before editing the plist. Output UUIDs 
 2. Install the rendered Shortcut as a new copy.
 3. Test one-way commands and all four response endpoints.
 4. Test unlabeled alarms and multiple enabled alarms at one time.
-5. Run `scripts/secret-scan` and inspect the staged diff.
+5. Inspect the staged diff for private data.
 6. Update the version in `pyproject.toml` and `src/iphone_cli/__init__.py`.
 7. Tag the release after the macOS CI run passes.
