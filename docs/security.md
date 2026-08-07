@@ -1,38 +1,36 @@
 # Security
 
-This project deliberately bridges a remote agent, private messages, native iOS actions, and a public hostname. Read this before making the repository public or broadening the Shortcut protocol.
+This project connects Codex, Messages, an iPhone Shortcut, and a public hostname. Screen text, screenshots, clipboard contents, alarms, Contacts, and Messages history may contain private data.
 
-## Protected data
+## Files that must stay private
 
-- The iMessage target identifies the user's account or phone number.
-- The receiver token authorizes uploads and reads of transient phone data.
-- Screen text, screenshots, clipboard contents, alarms, contacts, and Messages history can all be sensitive.
-- Cloudflare tunnel credential JSON files authorize a tunnel in the user's account.
+- `~/.config/codex-ios-assistant/config.env` contains the iMessage target and receiver token.
+- `~/.config/codex-ios-assistant/cloudflared.yml` names the tunnel credentials file.
+- `~/.cloudflared/<tunnel-id>.json` authorizes the tunnel.
+- `build/ios-assistant-actions.plist` contains the receiver hostname and token.
+- `~/.local/share/codex-ios-assistant/inbox/` contains screenshots.
 
-None of those values belongs in Git. Private config lives under `~/.config/codex-ios-assistant`, incoming images under `~/.local/share/codex-ios-assistant`, and logs under `~/Library/Logs/codex-ios-assistant`.
+The installer keeps these files outside Git or under ignored paths. Config files and screenshots use mode `0600`; their parent directories use `0700`.
 
-## Existing controls
+## Receiver
 
-- The local receiver binds only to loopback.
-- All data endpoints require an exact `X-Auth` token of at least 32 characters.
-- Public health checks reveal only that the receiver is up.
-- Logs redact response contents and record only sizes/counts and short correlation IDs.
-- The Messages sender socket is mode `0600`, verifies the peer UID where macOS exposes it, and accepts only one bounded `hola …` line.
-- AppleScript source and executable paths are fixed; callers cannot supply a shell command.
-- The Shortcut template contains placeholders. The renderer writes its private output mode `0600` to an ignored directory.
-- Message drafts are opened for review rather than sent automatically. Commerce and rideshare URLs navigate but do not complete transactions.
+The receiver binds to `127.0.0.1`. Cloudflare is its public route. Phone-data endpoints require an exact `X-Auth` token with at least 32 characters. `/` and `/health` expose a fixed status string.
 
-## Limitations
+Receiver logs include byte counts, alarm counts, and request IDs. They do not include screen text, clipboard values, or alarm details. Text responses live in memory. Screenshots remain on disk until you remove them.
 
-The receiver token is a bearer secret embedded in the installed Shortcut. Anyone who obtains it and knows the public hostname can post fabricated results or retrieve a response if they also guess a short-lived request ID. Cloudflare encrypts transport, but the project does not currently provide per-request signatures or replay prevention.
+The token is a bearer secret stored in the Shortcut. Someone who obtains the token and hostname could submit false responses or read a response after guessing its request ID. The current protocol has no request signature, expiration, or replay check.
 
-The receiver stores transient text responses in memory and screenshots on disk. It does not automatically expire screenshots. Users should delete sensitive images from the inbox when no longer needed.
+## Messages sender
 
-The Message personal automation is part of the trust boundary. Restrict it to the expected sender/self identity and messages containing `hola`. Do not make the Shortcut execute arbitrary shell commands or arbitrary Shortcuts actions derived directly from message text.
+The sender listens on a mode-`0600` Unix socket. It checks the peer UID when macOS provides one, rejects newlines and requests over 4 KiB, and accepts commands beginning with `hola `. It runs fixed AppleScript through `/usr/bin/osascript`; clients cannot choose the program or script.
 
-## Before publishing a change
+Restrict the iPhone Message automation to the expected sender and messages containing `hola`. Do not add a Shortcut branch that turns message text into arbitrary commands or runs an arbitrary Shortcut.
 
-Run:
+The CLI opens message drafts for review. It does not send them. Commerce and rideshare links open a page without placing an order or requesting a ride.
+
+## Check a commit
+
+Run these commands before pushing:
 
 ```bash
 make test
@@ -41,6 +39,6 @@ git status --short
 git diff --cached
 ```
 
-Inspect the entire staged diff. At minimum, search for personal domains, email addresses, phone numbers, `/Users/...` paths, quick-tunnel hostnames, receiver tokens, Cloudflare tunnel UUIDs, and private key material. Avoid relying on `.gitignore` after a sensitive file has already been staged.
+Inspect the staged diff for personal domains, email addresses, phone numbers, `/Users/<name>` paths, tokens, tunnel UUIDs, and private keys. `.gitignore` does not protect a file after Git has staged it.
 
-If a token or Cloudflare credential is ever committed, remove it from history before publishing and rotate it. Treat deletion from the current tree as insufficient because Git preserves prior commits.
+If a token or tunnel credential reaches a commit, rotate it and remove it from Git history before publishing the repository. Deleting it in a later commit leaves the original value in history.

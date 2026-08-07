@@ -1,8 +1,8 @@
-# Commands and behavior
+# Commands
 
-Run `iphone --help` or `iphone <resource> --help` for the complete, version-matched syntax. Global flags can appear before or after a leaf command.
+Run `iphone --help` or `iphone <resource> --help` for full syntax. Global flags work before or after a leaf command.
 
-## Diagnostics and output
+## Output and diagnostics
 
 ```bash
 iphone doctor
@@ -11,7 +11,7 @@ iphone --dry-run timer start 10m
 iphone --json --dry-run weather open --location Chicago --lat 41.8781 --lng -87.6298
 ```
 
-Use `--dry-run` before asking the phone to do anything unfamiliar. Use `--json` for automation and `--verbose` to include result status and URLs.
+`--dry-run` prints the request without contacting the phone. `--json` returns structured output. `--verbose` prints status and URL details on stderr.
 
 ## Screen, clipboard, and alarms
 
@@ -26,7 +26,7 @@ iphone alarm set '7:30 AM' --label 'Wake up'
 iphone alarm off '7:30 AM'
 ```
 
-`alarm list` returns enabled alarms only. `alarm off` turns off every enabled alarm whose hour and minute exactly match, including alarms without labels. It does not delete alarms.
+`alarm list` returns enabled alarms. `alarm off` disables every enabled alarm at the specified hour and minute, including unlabeled alarms. It does not delete them.
 
 ## Device controls
 
@@ -43,9 +43,9 @@ iphone control-center open
 iphone call 'Jane Appleseed'
 ```
 
-A call is an external side effect. Agents should confirm the intended recipient immediately before placing it unless the user's current request is already explicit.
+A call starts at once. Confirm the recipient unless the user's current request names the person or number and asks you to call.
 
-## Apps and URLs
+## Apps and links
 
 ```bash
 iphone url open https://example.com
@@ -66,9 +66,9 @@ iphone wallet open
 iphone notes open
 ```
 
-Messages composition opens an unsent draft; the CLI does not press Send. Store, rideshare, media, and App Store commands only navigate. They do not purchase, order, request a ride, play media, or install an app.
+`messages compose` opens an unsent draft. Store, rideshare, media, and App Store commands open the requested page without completing a purchase, order, ride, playback action, or installation.
 
-## Mac-side read-only data
+## Mac data
 
 ```bash
 iphone contacts search 'Jane'
@@ -76,4 +76,4 @@ iphone messages chats --limit 20
 iphone messages history --chat-id 42 --limit 20
 ```
 
-Contacts uses the compiled helper. Message history uses the optional `imsg` executable and the local Messages database. These commands read Mac-synced data and do not contact the iPhone Shortcut.
+Contacts uses the bundled Swift helper. Message history uses `imsg` and the Mac's Messages database. These read-only commands do not run the iPhone Shortcut.

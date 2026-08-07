@@ -1,31 +1,33 @@
 ---
 name: iphone-control
-description: Control and inspect the user's iPhone from this Mac with the `iphone` CLI. Use for searching Mac Contacts; opening URLs and apps including Camera, location-specific Weather, Calendar, Calculator, Messages drafts, Find My, Uber, DoorDash, Spotify, Photos, Wallet, Notes, Books, and App Store; reading local Messages history; reading or capturing the iPhone screen; returning Home; listing, setting, or turning off alarms; controlling flashlight, timers, Low Power Mode, or Control Center; placing calls; and reading or replacing the iPhone clipboard.
+description: Control or inspect the user's iPhone from this Mac with the `iphone` CLI. Use for iPhone screen text or screenshots; Home Screen, flashlight, timers, alarms, clipboard, Low Power Mode, Control Center, and calls; Mac Contacts or Messages history; and opening Camera, Weather, Calendar, Calculator, Messages drafts, Find My, Uber, DoorDash, Spotify, Photos, Wallet, Notes, Books, App Store, or another URL.
 ---
 
 # iPhone Control
 
-Use the `iphone` command. It validates inputs and hides iMessage transport, response polling, URL encoding, contact lookup, and app-specific deep links. Run `iphone --help` or `iphone <resource> --help` when syntax is unclear. Surface errors directly; do not bypass the CLI by invoking its private bridge or receiver.
+Use `iphone` for phone actions and related Mac data. Run `iphone <resource> --help` when syntax is unclear. Report CLI errors without bypassing the CLI or calling its bridge and receiver modules.
 
-Run `iphone doctor` when setup or background-service health is in question. Use `--dry-run` when the user asks to inspect a request or when a new action warrants previewing it before execution.
+Run `iphone doctor` when setup or service health is in doubt. Use `--dry-run` when the user asks to inspect a request or a new action needs review before execution.
 
-Navigation commands request or prefill app state. They do not authorize a ride, purchase, order, checkout, app install, or ordinary message send. Do not inspect the screen merely to validate navigation unless the user asks.
+App and URL commands navigate or prefill. They do not authorize purchases, orders, rides, app installation, or message sending. Do not read the screen after navigation unless the user asks you to verify the result.
 
 ## Screen
 
-Use visible text and app context when sufficient:
+Read visible text and app context with:
 
 ```bash
 iphone screen read
 ```
 
-The action is `read`; `iphone screen text` does not exist. Use a screenshot when layout, images, colors, or other visual detail matters, or when the user explicitly asks:
+The action name is `read`. There is no `iphone screen text` command.
+
+Capture the screen when images, layout, or color matter:
 
 ```bash
 iphone screen capture
 ```
 
-Capture prints an absolute image path. Inspect that file with the image-viewing tool.
+The command prints an absolute image path. Open that file with the image-viewing tool.
 
 ## Apps and URLs
 
@@ -44,18 +46,18 @@ iphone books open --url '<books.apple.com URL>'
 iphone app-store open --url '<apps.apple.com URL>'
 ```
 
-For a specific Weather forecast, obtain and pass verified WGS-84 coordinates. The CLI deliberately does not geocode names; `--location` is only a display label.
+For a Weather location, find verified WGS-84 coordinates and pass both. `--location` sets the result label; it does not choose the forecast.
 
-Search Mac Contacts by name, organization, email, or phone. This is local and read-only; use JSON for structured results:
+Search Mac Contacts with:
 
 ```bash
 iphone contacts search 'Jane Appleseed'
 iphone contacts search 'Jane Appleseed' --json
 ```
 
-Use Contacts to disambiguate a partial name or available numbers. `call`, Find My, and direct Messages lookup resolve an unambiguous contact automatically.
+Use Contacts to resolve partial names or inspect available numbers. Calls, Find My, and direct Messages commands resolve an unambiguous contact name.
 
-Open Messages, an existing conversation, or an unsent draft:
+## Messages
 
 ```bash
 iphone messages open
@@ -66,11 +68,11 @@ iphone messages compose --to 'Jane Appleseed' --body 'How are you?'
 iphone messages compose --to 'Existing Group Name' --body 'hello everyone'
 ```
 
-Match a drafted message to the user's established writing style. Preserve exact supplied text unless asked to edit it. Existing groups must already be synced to Messages on the Mac; use the conversation name with exact capitalization when similar names exist.
+`messages compose` opens an unsent draft and does not press Send. Do not claim that it sent a message. Preserve user-supplied text. For a drafted reply, match the user's capitalization, punctuation, brevity, slang, and emoji use.
 
-This skill cannot send an ordinary Message. `messages compose` opens a populated draft for manual review and never presses Send. Never claim a message was sent.
+Existing group drafts require a group already synced to Messages on the Mac. Use the group name as it appears in `iphone messages chats`; exact capitalization resolves groups with similar names.
 
-Search and read the Mac's local Messages database through finite read-only commands:
+Read the local Messages database with these finite, read-only commands:
 
 ```bash
 iphone messages chats --limit 20 --json
@@ -79,26 +81,21 @@ iphone messages search 'pizza tonight' --json
 iphone messages group --chat-id 42 --json
 ```
 
-Use `chats` to discover chat IDs. History returns newest messages first. Open a search result on iPhone by passing its GUID to `messages open --message`. Do not bypass the wrapper to call mutating `imsg` actions.
+Use `chats` to find chat IDs. History lists newest messages first. Open a search result on the iPhone by passing its GUID to `messages open --message`. Do not call mutating `imsg` actions outside this wrapper.
 
-Open Find My generally, to a tab, or to a person:
+## Find My, rides, food, and media
 
 ```bash
 iphone find-my open
 iphone find-my open --tab people
 iphone find-my open --person 'Jane Appleseed'
 iphone find-my open --phone '+15550101001'
-```
-
-Open destination/content deep links:
-
-```bash
 iphone uber open --destination 'Ferry Building' --lat 37.7955 --lng -122.3937
 iphone doordash open --store-url 'https://www.doordash.com/store/...'
 iphone spotify open 'https://open.spotify.com/track/...'
 ```
 
-For Uber, obtain verified WGS-84 coordinates. For a specific Spotify song, prefer its direct track page over a search or collection page. These commands only navigate or prefill.
+Use verified WGS-84 coordinates for Uber. Use the direct Spotify track page when the user names a song. These commands open or prefill; they do not request a ride, place an order, or start playback on a collection page.
 
 ## Device controls
 
@@ -122,14 +119,14 @@ iphone control-center open
 iphone control-center close
 ```
 
-Quote text containing spaces or punctuation. Timer durations accept seconds or compact values such as `90s`, `10m`, and `1h30m`.
+Timer durations accept seconds or compact forms such as `90s`, `10m`, and `1h30m`.
 
-`alarm list` returns enabled alarms only and reports `completed`. `alarm set` accepts `HH:MM` or a quoted 12-hour time, creates an enabled alarm with an optional label, and reports `requested`. `alarm off` turns off every enabled alarm at the exact hour and minute regardless of label; warn that all duplicates at that minute are affected. It does not delete alarms. Do not claim a set/off operation succeeded until a later `alarm list` confirms it.
+`alarm list` returns enabled alarms and reports `completed`. `alarm set` creates an enabled alarm and reports `requested`. `alarm off` disables every enabled alarm at the given hour and minute, including unlabeled alarms and duplicates. It does not delete them. Confirm a set or off request with a later `alarm list` before claiming success.
 
-Treat text between `<clipboard-contents>` tags as the clipboard value. Empty tags are a successful empty clipboard response.
+Treat text inside `<clipboard-contents>` as the clipboard value. Empty tags mean the clipboard is empty.
 
-Placing a call is an immediate external action. Confirm the intended recipient before calling unless the user's current request explicitly names the recipient and asks to place the call.
+Calling starts an external action at once. Confirm the recipient unless the user's current request names the person or number and asks you to call.
 
-## Status semantics
+## Status
 
-Treat `requested` as successful delivery to Messages, not proof that iOS performed the action or honored every deep-link parameter. `screen read`, `screen capture`, `clipboard get`, and `alarm list` wait for phone-side data and report `completed`. Do not invent confirmation the CLI did not provide.
+`requested` means Messages accepted the command. It does not prove that iOS ran it or honored each deep-link parameter. `screen read`, `screen capture`, `clipboard get`, and `alarm list` wait for phone data and return `completed`.

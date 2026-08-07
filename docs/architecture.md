@@ -1,20 +1,20 @@
 # Architecture and protocol
 
-The system separates command delivery from response delivery. Commands are small private iMessages; sensitive responses use HTTPS and never travel back through Messages.
+The Mac sends commands through iMessage. The iPhone returns data through HTTPS.
 
 ## Components
 
-1. The `iphone` CLI validates intent, builds Apple URLs or Shortcut protocol commands, and presents stable text/JSON results.
-2. The Codex skill teaches an agent when and how to invoke that CLI safely.
-3. The sender LaunchAgent accepts a narrowly validated local command over a mode-`0600` Unix socket and automates Messages in the user's GUI session.
-4. An iPhone Message personal automation invokes the 95-action Shortcut for `hola …` messages.
-5. The Shortcut performs native iOS actions. Response-producing branches POST to `/text`, `/photo`, `/clipboard`, or `/get-alarm`.
-6. A named Cloudflare Tunnel forwards the stable public HTTPS hostname to the receiver bound on `127.0.0.1:8787`.
-7. The receiver correlates responses by a random five-digit request ID. The CLI polls the loopback receiver until the matching result arrives or times out.
+1. The `iphone` CLI validates arguments and builds either an Apple URL or a Shortcut command.
+2. The `iphone-control` skill tells Codex which CLI command to use and how to interpret its result.
+3. A per-user LaunchAgent accepts commands on a Unix socket and automates Messages in the macOS GUI session.
+4. A Message automation on the iPhone runs the 95-action Shortcut for messages that match `hola`.
+5. The Shortcut runs an iOS action. Branches that produce data post to `/text`, `/photo`, `/clipboard`, or `/get-alarm`.
+6. A named Cloudflare Tunnel sends requests for the public hostname to the receiver on `127.0.0.1:8787`.
+7. The CLI polls the local receiver for text data or watches the private inbox for a screenshot until it gets a response or reaches the timeout.
 
-## Command protocol
+## Command format
 
-Every outbound command is one line beginning with `hola `. The current Shortcut recognizes these forms:
+The sender accepts one line beginning with `hola `:
 
 ```text
 hola openurl <url>
@@ -36,37 +36,37 @@ hola controlcenter open|close
 hola call <phone>
 ```
 
-The CLI is the supported interface. These protocol strings are documented for maintainers, not as an invitation to bypass input validation.
+Use the CLI rather than writing these messages yourself. The CLI checks times, phone numbers, URLs, and durations. The sender enforces the command size and line format.
 
-## Response protocol
+## Response format
 
-All data endpoints require the configured token in `X-Auth`. Correlation IDs use the `X-Screenshot-Id` header for historical compatibility.
+Data endpoints require the receiver token in `X-Auth`. The Shortcut puts the request ID in `X-Screenshot-Id`, a header name retained for compatibility with the original screenshot branch.
 
-| Shortcut request | HTTP response | CLI behavior |
+| Command | Shortcut request | CLI wait |
 | --- | --- | --- |
-| `hola screentext <id>` | JSON to `POST /text` | Polls `GET /text/<id>` every 0.5 seconds, default 30 seconds |
-| `hola screenshot <id>` | Image to `POST /photo` | Watches the private inbox, default 45 seconds |
-| `hola getclipboard <id>` | Text/JSON to `POST /clipboard` | Polls `GET /clipboard/<id>`, default 30 seconds |
-| `hola alarm get <id>` | Enabled alarm data to `POST /get-alarm` | Polls `GET /get-alarm/<id>`, default 30 seconds |
+| `hola screentext <id>` | JSON to `POST /text` | Poll `GET /text/<id>` every 0.5 seconds for up to 30 seconds |
+| `hola screenshot <id>` | Image to `POST /photo` | Watch the private inbox for up to 45 seconds |
+| `hola getclipboard <id>` | Text or JSON to `POST /clipboard` | Poll `GET /clipboard/<id>` for up to 30 seconds |
+| `hola alarm get <id>` | Alarm data to `POST /get-alarm` | Poll `GET /get-alarm/<id>` for up to 30 seconds |
 
-The receiver keeps at most 200 in-memory values of each text response type. Screenshots are persisted under `~/.local/share/codex-ios-assistant/inbox`. Restarting the receiver clears in-memory response values, which is fine because IDs are short-lived.
+The receiver keeps up to 200 screen, clipboard, and alarm responses in memory. It saves screenshots under `~/.local/share/codex-ios-assistant/inbox/`. Restarting the receiver clears the in-memory values.
 
-## Result semantics
+## CLI status values
 
-- `dry-run`: nothing was sent; the CLI reports the exact underlying command or URL.
-- `requested`: Messages accepted the request, but the branch has no correlated phone-side receipt.
-- `completed`: a correlated response arrived or a local read-only helper completed.
-- `failed`: the doctor found a missing required layer, or the command exited with an error.
+- `dry-run`: the CLI printed the command without sending it.
+- `requested`: Messages accepted the command. The phone did not return a receipt.
+- `completed`: the phone returned matching data, or a Mac-side read finished.
+- `failed`: a required service is missing or a helper returned an error.
 
-`requested` is not proof that iOS performed an action. A future protocol could add acknowledgements for one-way actions, but the current design avoids a second HTTP request for every simple command.
+A `requested` result confirms delivery to Messages, not execution on iOS. One-way actions do not post acknowledgements.
 
-## Why not send directly from sandboxed Codex?
+## Messages sender
 
-AppleScript calls made inside an application sandbox can fail before permission is considered, with errors such as `Unable to find application named 'Messages'` or `LSCopyApplicationURLsForBundleIdentifier() failed`. The sender LaunchAgent is launched by `launchd` in the user's GUI domain. Codex contacts it through a local Unix socket; the agent, not the sandboxed process, resolves and automates Messages.
+Sandboxed AppleScript can fail with `Unable to find application named 'Messages'` or an `LSCopyApplicationURLsForBundleIdentifier()` error. The sender LaunchAgent runs in the user's GUI domain, so it can resolve and automate Messages. Codex reaches it through a local socket.
 
-The boundary remains narrow:
+The sender accepts a narrow input:
 
-- only the current macOS user can open the `0600` socket;
-- only a small JSON object containing one `hola …` line is accepted;
-- newlines and messages over 4 KiB are rejected;
-- the server invokes a fixed `/usr/bin/osascript` program rather than a caller-provided command.
+- The socket has mode `0600`.
+- The sender checks the peer UID when macOS exposes it.
+- Each request contains one `hola` line, with a 4 KiB limit and no newline.
+- The sender calls a fixed `/usr/bin/osascript` program. The client cannot supply an executable or script.

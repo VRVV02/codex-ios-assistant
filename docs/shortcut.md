@@ -1,65 +1,59 @@
-# Shortcut source and maintenance
+# Shortcut maintenance
 
-`shortcut/actions.template.plist` is a sanitized list of 95 native Shortcuts actions. It contains placeholders instead of a user's hostname and receiver token:
+`shortcut/actions.template.plist` contains 95 native Shortcuts actions. The committed template replaces private values with:
 
 ```text
 __IOS_ASSISTANT_PUBLIC_URL__
 __IOS_ASSISTANT_RECEIVER_TOKEN__
 ```
 
-`scripts/render-shortcut.py` substitutes values from the private config and writes the ignored, mode-`0600` artifact under `build/`.
+`scripts/render-shortcut.py` reads the private config, substitutes both values, and writes `build/ios-assistant-actions.plist` with mode `0600`.
 
-## The Command-V installation technique
+## Pasteboard installation
 
-Shortcuts on macOS uses the pasteboard type `com.apple.shortcuts.action`. Each copied action is a separate pasteboard item containing a binary property list. `scripts/copy-shortcut-actions.swift` recreates that representation from the committed action array and verifies every item before reporting success.
+Shortcuts on macOS copies actions under the pasteboard type `com.apple.shortcuts.action`. Each action is a separate pasteboard item containing a binary plist.
 
-This is why the workflow can be installed without signing or importing a `.shortcut` package:
+`scripts/copy-shortcut-actions.swift` recreates those items from the action array. The install flow is:
 
 1. `scripts/copy-shortcut` renders the private action list.
-2. The Swift helper serializes each action as one native pasteboard item.
-3. The user creates a blank Shortcut and presses Command-V once.
-4. Shortcuts reconstructs the complete action graph, including UUID references and grouped control flow.
+2. The Swift helper writes one pasteboard item per action and checks the item count.
+3. You paste once into a blank Shortcut.
+4. Shortcuts rebuilds the UUID references and grouped control flow.
 
-The technique depends on an implementation detail of the macOS Shortcuts app. If Apple changes the pasteboard representation, the committed plist remains readable but the copy helper may need an update.
+This relies on an undocumented Shortcuts pasteboard format. Apple may change it in a future macOS release.
 
-## Current branches
+## Branches
 
-The action graph dispatches the incoming text by prefix and handles:
+The Shortcut handles:
 
-- timer start/pause/resume/cancel;
+- timer start, pause, resume, and cancel;
 - flashlight, Low Power Mode, and Control Center;
-- call, clipboard read/write, and generic URL opening;
-- screen text, screenshot, and Home Screen;
+- calls, clipboard reads and writes, and URL opening;
+- screen text, screenshots, and Home Screen;
 - enabled-alarm listing, alarm creation, and time-based alarm disabling.
 
-Screen text and screenshots are intentionally different commands and endpoints. `hola screentext <id>` extracts native on-screen content and posts JSON to `/text`. `hola screenshot <id>` takes an image and posts it to `/photo`.
+Screen text and screenshots use separate commands. `hola screentext <id>` collects visible text and posts JSON to `/text`. `hola screenshot <id>` captures an image and posts it to `/photo`.
 
-The alarm list branch uses `Find Alarms` with an enabled filter before formatting results. This avoids iterating through hundreds of disabled alarms. The off branch filters enabled alarms by hour and minute, then disables all exact-time matches, including unlabeled alarms.
+The alarm list branch filters for enabled alarms before it loops over results. The off branch filters enabled alarms by hour and minute, then disables all matches. Labels are not part of the comparison.
 
-## Inspect copied actions while developing
+## Inspect a native action
 
-`scripts/inspect-shortcuts-clipboard.swift` prints the property lists currently present under the Shortcuts action pasteboard type.
+`scripts/inspect-shortcuts-clipboard.swift` prints the plist for copied Shortcuts actions.
 
-To study a new native action:
+To study an action:
 
-1. Build the smallest possible scratch Shortcut in the Shortcuts app.
-2. Select only the action or tightly coupled block you need.
-3. Press Command-C.
-4. Run `swift scripts/inspect-shortcuts-clipboard.swift` and save the terminal output outside the repo while studying it.
-5. Identify action identifiers, parameters, output UUIDs, and control-flow grouping identifiers.
-6. Recreate the change in a working copy of the action plist.
-7. Run `make test`, especially the structural validator.
-8. Copy the full result into a new blank Shortcut and exercise both the changed and neighboring branches on a real iPhone.
+1. Build a small scratch Shortcut.
+2. Select the action or connected block and press Command-C.
+3. Run `swift scripts/inspect-shortcuts-clipboard.swift`.
+4. Record the action identifier, parameters, output UUIDs, and grouping identifiers.
+5. Apply the same structure to a working copy of the template.
+6. Run `make test`.
+7. Paste the full action list into a new Shortcut and test the changed branch on an iPhone.
 
-Dynamic values usually contain an `ActionOutput` attachment with an `OutputUUID`. That UUID must refer to an earlier action. Conditional and repeat blocks share a `GroupingIdentifier`; their start/end modes must remain balanced. Alarm predicates also contain archived native objects, so treat those blocks as opaque unless you have reproduced and inspected the exact change in Shortcuts.
+An `ActionOutput` attachment refers to an earlier action through `OutputUUID`. Conditional and repeat blocks pair start and end actions with one `GroupingIdentifier`. Alarm predicates contain archived native objects; reproduce them in Shortcuts instead of guessing their plist format.
 
-## Source-of-truth policy
+## Commit policy
 
-The sanitized plist is the public source of truth. Never commit:
+Commit the sanitized template. Do not commit rendered plists, exported Shortcuts, screenshots, tokens, tunnel credentials, or personal phone data.
 
-- a rendered plist from `build/`;
-- an exported Shortcut containing a real token or hostname;
-- screenshots of the user's messages, screen contents, contacts, or alarms;
-- Cloudflare credential JSON files.
-
-After a functional Shortcut edit, update the branch documentation and add or strengthen validation. `scripts/validate-shortcut.py` checks the action count, placeholder count, forbidden personal strings, backward output references, and balanced control-flow groups.
+`scripts/validate-shortcut.py` checks the action count, placeholder count, unsupported legacy actions, output references, and control-flow groups. Add a validation rule when a Shortcut change introduces another structural assumption.

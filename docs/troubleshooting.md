@@ -1,14 +1,15 @@
 # Troubleshooting
 
-## `Unable to find application named 'Messages'`
+## Messages cannot be found
 
-Or:
+Errors may include:
 
 ```text
+Unable to find application named 'Messages'
 LSCopyApplicationURLsForBundleIdentifier() failed ... com.apple.MobileSMS
 ```
 
-This usually means AppleScript was launched inside an application sandbox that cannot resolve Messages. Do not point the CLI back at a direct AppleScript helper. Install and start this project's GUI-domain sender:
+These errors occur when sandboxed AppleScript cannot resolve Messages. Use the per-user sender instead of a direct AppleScript transport:
 
 ```bash
 ./scripts/install
@@ -16,31 +17,30 @@ This usually means AppleScript was launched inside an application sandbox that c
 iphone doctor
 ```
 
-The doctor should show the Messages sender socket as available. Inspect `~/Library/Logs/codex-ios-assistant/sender.log` if it does not.
+`iphone doctor` should report the Messages sender socket as available. Check `~/Library/Logs/codex-ios-assistant/sender.log` if it does not.
 
 ## Messages automation is denied
 
-Open System Settings → Privacy & Security → Automation and allow the Python process used by `io.github.codex-ios-assistant.sender` to control Messages. Also confirm Messages is openable and signed into an enabled iMessage account.
+Open System Settings > Privacy & Security > Automation. Allow the Python process used by `io.github.codex-ios-assistant.sender` to control Messages. Confirm that Messages opens and has an enabled iMessage account.
 
-Restart the sender after changing permission:
+Restart the sender after changing the permission:
 
 ```bash
 launchctl kickstart -k "gui/$(id -u)/io.github.codex-ios-assistant.sender"
 ```
 
-## The command appears in Messages, but nothing happens on iPhone
+## The iMessage arrives but the iPhone does nothing
 
-- Confirm the message reached the same iPhone.
-- Open Shortcuts → Automation and confirm the Message automation is enabled and runs immediately.
-- Confirm its content filter matches `hola` and it runs the intended `iOS Assistant` Shortcut.
-- Run the Shortcut manually once so iOS can show pending permission prompts.
-- Open the specific automation's run history if your iOS version exposes it.
+- Confirm that the message reached the intended iPhone.
+- Check Shortcuts > Automation and make sure the Message automation runs without confirmation.
+- Check that `Message Contains` is `hola` and that the automation runs `iOS Assistant`.
+- Run the Shortcut by hand to expose pending permission prompts.
 
-For diagnosis, start with `iphone home`, because it does not depend on the tunnel.
+Start with `iphone home`. That command tests Messages and the automation without using the tunnel.
 
-## `The network connection was lost` in Shortcuts
+## Shortcuts reports a lost network connection
 
-Check both ends:
+Test the receiver first, then the tunnel:
 
 ```bash
 curl http://127.0.0.1:8787/health
@@ -51,27 +51,31 @@ tail -n 100 ~/Library/Logs/codex-ios-assistant/receiver.log
 tail -n 100 ~/Library/Logs/codex-ios-assistant/tunnel.log
 ```
 
-Replace the example hostname with the configured one. If local health works but public health does not, rerun `scripts/setup-cloudflare` and `scripts/install-services`. If both work, verify that the Shortcut was rendered after the latest hostname/token change and allow its network permission prompt.
+Use your configured hostname in the second command. If local health works and public health fails, rerun `scripts/setup-cloudflare` and `scripts/install-services`. If both work, rebuild the Shortcut so it contains the current hostname and token.
+
+On the iPhone, run the Shortcut by hand and grant access to the hostname when iOS asks.
 
 ## A response command times out
 
-The default response timeout is 30 seconds (45 for screenshots), and polling occurs every 0.5 seconds. Separate the pipeline:
+The CLI polls every 0.5 seconds. Screen text, alarms, and clipboard commands wait 30 seconds by default; screenshots wait 45 seconds.
 
-1. Did the command appear in Messages quickly? If not, inspect the sender.
-2. Did the automation start? If not, inspect the iPhone trigger.
-3. Did the Shortcut branch finish? Run it manually to expose permissions/errors.
-4. Did the receiver log a correlated POST? If not, inspect the tunnel and Shortcut URL/header.
-5. Did the ID in the command match the logged ID? A stale or modified Shortcut may omit it.
+Check the path in order:
 
-Temporarily increase the wait without changing defaults:
+1. Look for the command in Messages. If it is missing, inspect the sender log.
+2. Watch the iPhone automation. If it does not start, check its Message conditions.
+3. Run the matching Shortcut branch by hand to expose an iOS error or permission prompt.
+4. Check the receiver log for a POST with the request ID from the message.
+5. Confirm that the Shortcut passed the same ID in `X-Screenshot-Id`.
+
+Increase the timeout for a slow phone without changing the default:
 
 ```bash
 iphone screen read --timeout 60
 ```
 
-## `imsg chats` crashes looking for a PhoneNumberKit bundle
+## `imsg` cannot find PhoneNumberKit
 
-An old standalone binary may have been copied without its Swift resource bundle. Remove that obsolete wrapper from earlier in `PATH` and install the packaged release:
+An old standalone `imsg` binary may be missing its Swift resource bundle. Find every copy and install the Homebrew package:
 
 ```bash
 which -a imsg
@@ -80,28 +84,29 @@ hash -r
 imsg --version
 ```
 
-The current project's command lookup uses `imsg` from `PATH`; it does not bundle or shadow the external tool.
+The project invokes `imsg` from `PATH`; it does not install a wrapper under that name.
 
-## `imsg` cannot read Messages history
+## `imsg` cannot read Messages
 
-Grant Full Disk Access to the parent application running the command (Terminal, ChatGPT, or another Codex host), then restart that application. Confirm `~/Library/Messages/chat.db` exists and Messages is syncing.
+Grant Full Disk Access to the application running Codex, then restart that application. Check that `~/Library/Messages/chat.db` exists and that Messages has finished syncing.
 
-## Contacts do not resolve
+## Contacts search fails
 
-Run the helper directly to trigger or diagnose macOS permission:
+Run the helper to trigger the macOS permission prompt:
 
 ```bash
 contacts search 'Jane'
 ```
 
-If the executable is missing, install Xcode Command Line Tools and rerun `scripts/install`.
+If `contacts` is missing, install Xcode Command Line Tools, accept the Xcode license, and rerun `scripts/install`.
 
-## The pasted Shortcut is incomplete or invalid
+## The pasted Shortcut is incomplete
 
-- Create a new blank Shortcut; do not paste over a partially built copy.
-- Click the action canvas and press Command-V only once.
-- Rerun `scripts/copy-shortcut` immediately before pasting.
-- Confirm the helper reports `Copied and verified 95 Shortcuts actions`.
-- Run `make test` to validate the committed template.
+- Paste into a new blank Shortcut rather than an existing action graph.
+- Click the canvas before pressing Command-V.
+- Press Command-V once.
+- Rerun `scripts/copy-shortcut` if the pasteboard contains something else.
+- Check for `Copied and verified 95 Shortcuts actions` in the terminal.
+- Run `make test` to validate the committed plist.
 
-Keep the prior working Shortcut and automation target until the replacement is tested.
+Keep the previous Shortcut until the replacement passes a test.

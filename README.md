@@ -1,21 +1,19 @@
 # Codex iOS Assistant
 
-Control and inspect an iPhone from Codex on your Mac. This project connects a semantic `iphone` CLI to an iOS Shortcut over iMessage, and returns screen text, screenshots, clipboard contents, and alarm data through an authenticated Cloudflare Tunnel.
+Codex iOS Assistant lets Codex on a Mac control an iPhone. The `iphone` CLI sends private commands through iMessage. An iOS Shortcut runs the requested action and returns screen text, screenshots, clipboard contents, or alarm data over an authenticated Cloudflare Tunnel.
 
-The intended experience is simple: open a Codex session from the ChatGPT app on your iPhone, ask Codex to interact with the phone, and let the Mac-hosted Codex session use the installed `iphone-control` skill.
+This is alpha software. Apple permission prompts and the iPhone Message automation require manual setup.
 
-> [!IMPORTANT]
-> This is an early macOS/iOS project. Setup includes a few manual Apple UI steps, and some commands intentionally report `requested` because iOS does not provide an execution receipt.
+## Supported commands
 
-## What it can do
+- Read visible text or save a screenshot from the iPhone.
+- Read and replace the clipboard.
+- List enabled alarms, create an alarm, or disable alarms at a given time.
+- Open Camera, Weather, Calendar, Calculator, Messages, Find My, Spotify, Photos, Wallet, Notes, Books, App Store, Uber, and DoorDash.
+- Open the Home Screen or Control Center; control timers, the flashlight, and Low Power Mode; place calls.
+- Search Mac Contacts and read the Mac's Messages database.
 
-- Read on-screen text or save a screenshot from the iPhone.
-- Return the iPhone clipboard, list enabled alarms, create an alarm, or turn off every enabled alarm at an exact time.
-- Open apps and deep links for Camera, Weather locations, Calendar dates, Calculator expressions, Messages, Find My, Uber, DoorDash, Spotify, Photos, Wallet, Notes, Books, and App Store pages.
-- Open the Home Screen or Control Center; control timers, the flashlight, and Low Power Mode; place calls; and replace clipboard text.
-- Search Mac Contacts and read local Messages history when the optional permissions and `imsg` dependency are installed.
-
-The project never asks the iPhone Shortcut to send an ordinary message. Message composition opens a populated draft for the user to review.
+Message composition opens a draft for review. The CLI does not send ordinary messages, buy anything, install apps, order food, or request rides.
 
 ## How it works
 
@@ -24,25 +22,25 @@ flowchart LR
     A["ChatGPT app on iPhone"] -->|Remote session| B["Codex on Mac"]
     B --> C["iphone CLI + skill"]
     C -->|Unix socket| D["Messages sender LaunchAgent"]
-    D -->|private 'hola …' iMessage| E["iPhone automation + Shortcut"]
+    D -->|private hola command| E["iPhone automation + Shortcut"]
     E --> F["Native iOS action"]
     E -->|authenticated HTTPS response| G["Cloudflare Tunnel"]
-    G --> H["loopback receiver on Mac"]
+    G --> H["receiver on Mac loopback"]
     H --> C
 ```
 
-The background Messages sender is deliberate. It runs in the user's normal GUI session so a sandboxed Codex process does not need to resolve or automate Messages itself.
+The Messages sender runs as a per-user LaunchAgent. This keeps Messages automation outside the Codex sandbox, where LaunchServices may be unable to resolve `com.apple.MobileSMS`.
 
-Read [Architecture](docs/architecture.md) for the protocol and trust boundaries.
+See [Architecture and protocol](docs/architecture.md) for request formats and trust boundaries.
 
 ## Requirements
 
-- A Mac with Python 3.11+, Messages signed into iMessage, and Xcode Command Line Tools.
-- An iPhone using the same Messages/iCloud setup, with iCloud sync enabled for Shortcuts.
-- A domain managed by Cloudflare so the receiver can use a stable HTTPS hostname.
-- The ChatGPT desktop and mobile apps if you want to control the Mac-hosted Codex session remotely.
+- A Mac running macOS 14 or newer, with Python 3.11+, Messages, and Xcode Command Line Tools.
+- An iPhone that receives messages sent to the configured iMessage address.
+- A domain managed in Cloudflare.
+- iCloud sync for Shortcuts.
 
-Homebrew is the easiest way to install `cloudflared` and the optional `imsg` history tool.
+The ChatGPT desktop and mobile apps are required only for the Remote workflow.
 
 ## Install
 
@@ -56,19 +54,11 @@ brew install cloudflared steipete/tap/imsg
 ./scripts/copy-shortcut
 ```
 
-The scripts ask for only three private values:
+Configuration has three values: the iMessage address that reaches your iPhone, a stable HTTPS hostname such as `https://iphone.example.com`, and a generated receiver token. The installer stores them in `~/.config/codex-ios-assistant/`, outside the repository.
 
-1. An iMessage address that reaches your iPhone.
-2. A stable HTTPS hostname such as `https://iphone.example.com`.
-3. A strong receiver token, generated automatically.
+`scripts/copy-shortcut` puts 95 native Shortcuts actions on the Mac clipboard. Paste them once into a blank shortcut, then create the Message automation on the iPhone. Follow the [installation guide](docs/installation.md) for those manual steps and the required Apple permissions.
 
-Private configuration is written to `~/.config/codex-ios-assistant/`, never to this checkout. The last command places the configured Shortcut actions on the Mac clipboard. Create a blank shortcut in Shortcuts and press Command-V once, then create the personal Message automation on the iPhone.
-
-Those Apple UI steps, permissions, Remote setup, and verification commands are covered precisely in the [Installation guide](docs/installation.md).
-
-## First test
-
-After the Shortcut and iPhone automation are installed:
+## Test the setup
 
 ```bash
 iphone doctor
@@ -78,31 +68,28 @@ iphone screen read --timeout 30
 iphone alarm list --timeout 30
 ```
 
-`iphone home` should report `requested`; the command reached Messages, but there is no phone-side receipt. `screen read` and `alarm list` wait for a correlated response and report `completed`.
+`iphone home` returns `requested` after Messages accepts the command. Commands that wait for data from the phone, including `screen read` and `alarm list`, return `completed` after the matching response reaches the Mac.
 
-## Repository map
+## Files
 
-| Path | Purpose |
+| Path | Contents |
 | --- | --- |
-| `src/iphone_cli/` | CLI, sandbox-safe Messages bridge, response receiver, URL builders |
-| `shortcut/actions.template.plist` | Sanitized source for the 95-action iOS Shortcut |
-| `scripts/` | Configure, install, tunnel, LaunchAgent, and Shortcut clipboard tooling |
-| `skills/iphone-control/` | Codex skill installed into `~/.agents/skills` |
-| `contacts/` | Small Swift Contacts lookup helper |
-| `tests/` | Python unit tests and Shortcut structural validation |
-| `docs/` | Installation, architecture, maintenance, security, and troubleshooting |
+| `src/iphone_cli/` | CLI, Messages bridge, receiver, and URL builders |
+| `shortcut/actions.template.plist` | Sanitized 95-action Shortcut template |
+| `scripts/` | Install, configuration, tunnel, LaunchAgent, and clipboard tools |
+| `skills/iphone-control/` | Codex skill installed under `~/.agents/skills` |
+| `contacts/` | Swift Contacts search helper |
+| `tests/` | Python tests and Shortcut validation |
 
-## Documentation
+## Docs
 
 - [Installation](docs/installation.md)
-- [Commands and behavior](docs/commands.md)
+- [Commands](docs/commands.md)
 - [Architecture and protocol](docs/architecture.md)
-- [Shortcut maintenance and the Command-V technique](docs/shortcut.md)
+- [Shortcut maintenance](docs/shortcut.md)
 - [Cloudflare Tunnel](docs/cloudflare.md)
 - [Security](docs/security.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Development](docs/development.md)
 
-## License
-
-MIT. See [LICENSE](LICENSE).
+Released under the [MIT License](LICENSE).

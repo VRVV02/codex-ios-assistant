@@ -1,17 +1,19 @@
 # Cloudflare Tunnel
 
-The receiver needs a public HTTPS origin because an iPhone cannot reach a Mac loopback port. This project uses a named Cloudflare Tunnel and a DNS hostname you own, rather than a temporary quick tunnel.
+The iPhone needs an HTTPS address for the Mac receiver. A named Cloudflare Tunnel gives the Shortcut a hostname that survives Mac reboots.
 
-## Automated setup
+## Setup
 
-After `scripts/configure` and `brew install cloudflared`, run:
+Install `cloudflared`, configure the project, then create the tunnel:
 
 ```bash
+brew install cloudflared
+./scripts/configure
 ./scripts/setup-cloudflare
 ./scripts/install-services
 ```
 
-The setup script follows Cloudflare's documented local-tunnel lifecycle:
+The setup script runs the equivalent of:
 
 ```bash
 cloudflared tunnel login
@@ -19,28 +21,28 @@ cloudflared tunnel create codex-ios-assistant
 cloudflared tunnel route dns codex-ios-assistant iphone.example.com
 ```
 
-It writes the tunnel UUID and credential path to the private file `~/.config/codex-ios-assistant/cloudflared.yml`. Do not copy a credential JSON into this repository.
+It writes the tunnel UUID and credentials path to `~/.config/codex-ios-assistant/cloudflared.yml`. Cloudflare keeps the credentials JSON under `~/.cloudflared/`. Do not copy either file into the repository.
 
-The setup script never overwrites an unrelated existing DNS record. If the chosen hostname is already occupied on first setup, select a dedicated free hostname or deliberately replace the record in Cloudflare before retrying.
+The script refuses to replace an existing DNS record. Use a free hostname, remove the old record in Cloudflare, or run the printed `--overwrite-dns` command after checking the record yourself.
 
-See Cloudflare's official guides for [creating a locally managed tunnel](https://developers.cloudflare.com/tunnel/advanced/local-management/create-local-tunnel/) and [running `cloudflared` as a macOS service](https://developers.cloudflare.com/tunnel/advanced/local-management/as-a-service/macos/). This project installs its own per-user LaunchAgent so its three related services can be managed together.
+Cloudflare documents this flow in [Create a locally-managed tunnel](https://developers.cloudflare.com/tunnel/advanced/local-management/create-local-tunnel/). This project runs `cloudflared` as a per-user LaunchAgent beside the sender and receiver.
 
-## Why the hostname persists
+## Stable hostname
 
-Cloudflare quick tunnels generate a random `trycloudflare.com` hostname every time. A named tunnel has a durable UUID, and the DNS CNAME remains associated with that tunnel. Rebooting the Mac reconnects the same tunnel without changing the URL embedded in the Shortcut.
+Quick tunnels assign a new `trycloudflare.com` hostname at startup. A named tunnel keeps its UUID, and the DNS record continues to point at that tunnel after a reboot.
 
-## Exposure
+## Network exposure
 
-`iphone-assistant-receiver` binds only to `127.0.0.1`. The tunnel is the sole public path. `/` and `/health` return a generic status without authentication; every endpoint that accepts or returns user data requires `X-Auth`.
+The receiver listens on `127.0.0.1`, so other machines on the local network cannot connect to port 8787. Cloudflare provides the public route.
 
-The last ingress rule is `http_status:404`, so unrecognized hostnames are not forwarded. Receiver logs record sizes and correlation IDs, not screen, clipboard, or alarm contents.
+`/` and `/health` return a generic status without authentication. All endpoints that accept or return phone data require `X-Auth`. The final tunnel ingress rule returns 404 for unknown hostnames. Receiver logs include response sizes and request IDs, but no screen, clipboard, or alarm contents.
 
 ## Change the hostname
 
-1. Rerun `scripts/configure --url https://new-host.example.com`.
-2. Rerun `scripts/setup-cloudflare` to create the new DNS route and rewrite the private tunnel config.
-3. Rerun `scripts/install-services`.
-4. Rerun `scripts/copy-shortcut` and paste the newly rendered actions into a new Shortcut.
-5. Point the iPhone Message automation to the new Shortcut.
+1. Run `scripts/configure --url https://new-host.example.com`.
+2. Run `scripts/setup-cloudflare` to create the DNS route and replace the private tunnel config.
+3. Run `scripts/install-services`.
+4. Run `scripts/copy-shortcut`, then paste the new actions into a blank Shortcut.
+5. Point the iPhone Message automation at the new Shortcut.
 
-Keep the old Shortcut until the public health check and a response-producing command work through the new hostname.
+Keep the old Shortcut until `/health` and one response command work through the new hostname.
