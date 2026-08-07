@@ -1,6 +1,6 @@
 # Codex iOS Assistant
 
-Codex iOS Assistant lets Codex on a Mac control an iPhone. The `iphone` CLI sends private commands through iMessage. An iOS Shortcut runs the requested action and returns screen text, screenshots, clipboard contents, or alarm data over an authenticated Cloudflare Tunnel.
+Codex iOS Assistant lets Codex on a Mac control an iPhone. The `iphone` CLI sends private commands through iMessage. An iOS Shortcut runs the requested action and returns context from your iPhone back to your Mac.
 
 > [!TIP]
 > This project is meant to be installed with Codex! To install it, please paste this message into a new Codex thread on your Mac:
