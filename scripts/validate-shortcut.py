@@ -8,9 +8,10 @@ from pathlib import Path
 import sys
 
 
-PUBLIC_PLACEHOLDER = "__IOS_ASSISTANT_PUBLIC_URL__"
+RECEIVER_URL_PLACEHOLDER = "__IOS_ASSISTANT_RECEIVER_URL__"
 TOKEN_PLACEHOLDER = "__IOS_ASSISTANT_RECEIVER_TOKEN__"
-FORBIDDEN = ("@gmail.com", "/Users/", "trycloudflare.com")
+COMMAND_PREFIX_PLACEHOLDER = "__IOS_ASSISTANT_COMMAND_PREFIX__"
+FORBIDDEN = ("@gmail.com", "/Users/", "trycloudflare.com", "hola")
 
 
 def walk(value: object):
@@ -31,20 +32,23 @@ def main() -> int:
         raise SystemExit(f"expected 95 Shortcut actions, found {len(actions) if isinstance(actions, list) else 'non-list'}")
 
     strings = [value for value in walk(actions) if isinstance(value, str)]
-    public_count = sum(value.count(PUBLIC_PLACEHOLDER) for value in strings)
+    receiver_url_count = sum(value.count(RECEIVER_URL_PLACEHOLDER) for value in strings)
     token_count = sum(value.count(TOKEN_PLACEHOLDER) for value in strings)
-    if public_count != 4 or token_count != 4:
-        raise SystemExit("expected four public URL and four receiver-token placeholders")
+    prefix_count = sum(value.count(COMMAND_PREFIX_PLACEHOLDER) for value in strings)
+    if receiver_url_count != 4 or token_count != 4 or prefix_count != 28:
+        raise SystemExit(
+            "expected four URL/token placeholders and 28 command-prefix placeholders"
+        )
     folded = "\n".join(strings).casefold()
     for forbidden in FORBIDDEN:
         if forbidden.casefold() in folded:
             raise SystemExit(f"private-looking value remains in template: {forbidden}")
-    if "hola say" in folded or "is.workflow.actions.speaktext" in folded:
+    if "is.workflow.actions.speaktext" in folded:
         raise SystemExit("unsupported legacy speech branch remains in the Shortcut template")
     literal_web_origins = [
         value
         for value in strings
-        if value.startswith("https://") and PUBLIC_PLACEHOLDER not in value
+        if value.startswith("https://") and RECEIVER_URL_PLACEHOLDER not in value
     ]
     if literal_web_origins:
         raise SystemExit("literal HTTPS origin remains in the Shortcut template")

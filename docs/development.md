@@ -21,7 +21,7 @@ swift build --package-path contacts --configuration release
 - Bind the receiver to loopback and authenticate every data endpoint.
 - Keep phone, Contacts, and Messages content out of logs.
 - Preserve the difference between `requested` and `completed`.
-- Validate input before building a `hola` command or app URL.
+- Validate input before building a prefixed command or app URL.
 - Keep message sending, purchases, ride requests, app installation, and alarm deletion out of the CLI.
 - Document Apple UI steps that scripts cannot perform.
 - Add tests for parser, URL, and response-format changes.

@@ -3,11 +3,12 @@
 `shortcut/actions.template.plist` contains 95 native Shortcuts actions. The committed template replaces private values with:
 
 ```text
-__IOS_ASSISTANT_PUBLIC_URL__
+__IOS_ASSISTANT_RECEIVER_URL__
 __IOS_ASSISTANT_RECEIVER_TOKEN__
+__IOS_ASSISTANT_COMMAND_PREFIX__
 ```
 
-`scripts/render-shortcut.py` reads the private config, substitutes both values, and writes `build/ios-assistant-actions.plist` with mode `0600`.
+`scripts/render-shortcut.py` reads the private config, substitutes the three values, and writes `build/ios-assistant-actions.plist` with mode `0600`.
 
 ## Pasteboard installation
 
@@ -32,7 +33,7 @@ The Shortcut handles:
 - screen text, screenshots, and Home Screen;
 - enabled-alarm listing, alarm creation, and time-based alarm disabling.
 
-Screen text and screenshots use separate commands. `hola screentext <id>` collects visible text and posts JSON to `/text`. `hola screenshot <id>` captures an image and posts it to `/photo`.
+Screen text and screenshots use separate commands. `<prefix> screentext <id>` collects visible text and posts JSON to `/text`. `<prefix> screenshot <id>` captures an image and posts it to `/photo`. The renderer replaces `<prefix>` with the random per-install command prefix.
 
 The alarm list branch filters for enabled alarms before it loops over results. The off branch filters enabled alarms by hour and minute, then disables all matches. Labels are not part of the comparison.
 

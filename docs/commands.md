@@ -43,7 +43,7 @@ iphone control-center open
 iphone call 'Jane Appleseed'
 ```
 
-A call starts at once. Confirm the recipient unless the user's current request names the person or number and asks you to call.
+A call starts at once. Confirm the recipient and intent immediately before every call.
 
 ## Apps and links
 

@@ -33,25 +33,27 @@ launchctl kickstart -k "gui/$(id -u)/io.github.codex-ios-assistant.sender"
 
 - Confirm that the message reached the intended iPhone.
 - Check Shortcuts > Automation and make sure the Message automation runs without confirmation.
-- Check that `Message Contains` is `hola` and that the automation runs `iOS Assistant`.
+- Run `./scripts/show-trigger` and confirm that `Message Contains` is that exact value.
+- Keep the automation's sender restriction set to your own iMessage contact.
 - Run the Shortcut by hand to expose pending permission prompts.
 
 Start with `iphone home`. That command tests Messages and the automation without using the tunnel.
 
 ## Shortcuts reports a lost network connection
 
-Test the receiver first, then the tunnel:
+Test the receiver first, then the private tailnet route:
 
 ```bash
 curl http://127.0.0.1:8787/health
-curl https://iphone.example.com/health
+tailscale serve status
 launchctl print "gui/$(id -u)/io.github.codex-ios-assistant.receiver"
-launchctl print "gui/$(id -u)/io.github.codex-ios-assistant.tunnel"
 tail -n 100 ~/Library/Logs/codex-ios-assistant/receiver.log
-tail -n 100 ~/Library/Logs/codex-ios-assistant/tunnel.log
 ```
 
-Use your configured hostname in the second command. If local health works and public health fails, rerun `scripts/setup-cloudflare` and `scripts/install-services`. If both work, rebuild the Shortcut so it contains the current hostname and token.
+Confirm Tailscale is connected on the iPhone and Mac. If local health works but
+the Shortcut callback fails, rerun `scripts/setup-tailscale`, then rebuild the
+Shortcut so it contains the current tailnet hostname, token, and trigger prefix.
+Do not enable Funnel.
 
 On the iPhone, run the Shortcut by hand and grant access to the hostname when iOS asks.
 
@@ -65,7 +67,8 @@ Check the path in order:
 2. Watch the iPhone automation. If it does not start, check its Message conditions.
 3. Run the matching Shortcut branch by hand to expose an iOS error or permission prompt.
 4. Check the receiver log for a POST with the request ID from the message.
-5. Confirm that the Shortcut passed the same ID in `X-Screenshot-Id`.
+5. Confirm that the Shortcut passed the same 32-character ID in `X-Screenshot-Id`.
+   A receiver `409` means the ID was unknown, expired, mismatched, or already used.
 
 Increase the timeout for a slow phone without changing the default:
 

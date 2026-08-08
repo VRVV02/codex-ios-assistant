@@ -1,43 +1,55 @@
-# Security
+# Security model
 
-This project connects Codex, Messages, an iPhone Shortcut, and a public hostname. Screen text, screenshots, clipboard contents, alarms, Contacts, and Messages history may contain private data.
+This fork keeps the iPhone-control capability while making the phone-to-Mac
+return path private by default. It is still powerful software: it can read what
+is visible on the phone, change device state, open apps, and initiate a call.
 
-## Files that must stay private
+## Trust boundaries
 
-- `~/.config/codex-ios-assistant/config.env` contains the iMessage target and receiver token.
-- `~/.config/codex-ios-assistant/cloudflared.yml` names the tunnel credentials file.
-- `~/.cloudflared/<tunnel-id>.json` authorizes the tunnel.
-- `build/ios-assistant-actions.plist` contains the receiver hostname and token.
-- `~/.local/share/codex-ios-assistant/inbox/` contains screenshots.
+- The receiver listens only on `127.0.0.1`.
+- Tailscale Serve exposes that loopback service only to devices admitted to the
+  same tailnet. Tailscale Funnel is not used and must not be enabled.
+- The iPhone Shortcut receives only the write token (`X-Auth`). It cannot read
+  stored phone data or register a request.
+- The Mac keeps a separate admin token (`X-Admin-Auth`) for registering and
+  consuming responses. That token is never rendered into the Shortcut.
+- Read requests use random 128-bit identifiers. The receiver accepts a phone
+  response only when the Mac registered the matching kind and identifier in the
+  previous two minutes. Responses are accepted and read once.
+- The Message automation uses a random per-install prefix rather than a common
+  phrase. Keep both the sender filter and exact prefix filter enabled.
+- The sender socket is mode `0600`, rejects other local users where macOS exposes
+  peer credentials, and accepts only one bounded single-line prefixed command.
 
-The installer keeps these files outside Git or under ignored paths. Config files and screenshots use mode `0600`; their parent directories use `0700`.
+## Data handling
 
-## Receiver
+Configuration is stored in `~/.config/codex-ios-assistant/config.env` with mode
+`0600`. Receiver data lives under `~/.local/share/codex-ios-assistant/` with mode
+`0700`. Text, clipboard, and alarm responses are removed after the first Mac
+read. Screenshot cleanup removes files older than 15 minutes when a new image
+arrives; remove a sensitive screenshot sooner if needed.
 
-The receiver binds to `127.0.0.1`. Cloudflare is its public route. Phone-data endpoints require an exact `X-Auth` token with at least 32 characters. `/` and `/health` expose a fixed status string.
+The receiver logs request identifiers and sizes, not screen, clipboard, alarm,
+or message contents.
 
-Receiver logs include byte counts, alarm counts, and request IDs. They do not include screen text, clipboard values, or alarm details. Text responses live in memory. Screenshots remain on disk until you remove them.
+## Command boundaries
 
-The token is a bearer secret stored in the Shortcut. Someone who obtains the token and hostname could submit false responses or read a response after guessing its request ID. The current protocol has no request signature, expiration, or replay check.
+Generic `iphone url open` accepts only HTTP and HTTPS URLs. Native deep links are
+available only through dedicated, validated commands, preventing an arbitrary
+`shortcuts://run-shortcut` payload. Message composition opens an unsent draft and
+does not add the private `sendImmediately` flag.
 
-## Messages sender
+Screen, clipboard, webpage, and Messages content is untrusted input. The bundled
+Codex skill explicitly forbids treating instructions found in that content as
+authority. Calls, messages, purchases, orders, rides, uploads, and permission
+changes require the user's direct intent in the current conversation.
 
-The sender listens on a mode-`0600` Unix socket. It checks the peer UID when macOS provides one, rejects newlines and requests over 4 KiB, and accepts commands beginning with `hola `. It runs fixed AppleScript through `/usr/bin/osascript`; clients cannot choose the program or script.
+## Residual risks
 
-Restrict the iPhone Message automation to the expected sender and messages containing `hola`. Do not add a Shortcut branch that turns message text into arbitrary commands or runs an arbitrary Shortcut.
-
-The CLI opens message drafts for review. It does not send them. Commerce and rideshare links open a page without placing an order or requesting a ride.
-
-## Check a commit
-
-Run these commands before pushing:
-
-```bash
-make test
-git status --short
-git diff --cached
-```
-
-Inspect the staged diff for personal domains, email addresses, phone numbers, `/Users/<name>` paths, tokens, tunnel UUIDs, and private keys. `.gitignore` does not protect a file after Git has staged it.
-
-If a token or tunnel credential reaches a commit, rotate it and remove it from Git history before publishing the repository. Deleting it in a later commit leaves the original value in history.
+This is not an Apple system entitlement or a security boundary. It composes
+supported automations, iMessage, deep links, and a Mac process. iOS may change or
+remove any of those behaviors. A compromised Mac account, compromised tailnet,
+compromised Apple account, maliciously modified Shortcut, or user-approved
+dangerous action can still cause harm. Use a small tailnet, require MFA, review
+tailnet members, keep macOS/iOS updated, and inspect Shortcut changes before
+installing them.

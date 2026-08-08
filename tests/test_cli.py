@@ -280,12 +280,19 @@ class CLITests(unittest.TestCase):
         self.assertEqual(value["seconds"], 600)
 
     def test_default_transport_uses_the_packaged_sender_bridge(self):
-        result = run_cli("timer", "start", "10m", "--dry-run", "--json")
+        result = run_cli(
+            "timer",
+            "start",
+            "10m",
+            "--dry-run",
+            "--json",
+            env={"IPHONE_COMMAND_PREFIX": "ios_deadbeef"},
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         value = json.loads(result.stdout)
         self.assertEqual(value["command"][0], str(Path(os.sys.executable)))
         self.assertEqual(value["command"][1:4], ["-m", "iphone_cli.bridge", "send"])
-        self.assertEqual(value["command"][4:7], ["hola", "timer", "start"])
+        self.assertEqual(value["command"][4:7], ["ios_deadbeef", "timer", "start"])
 
     def test_specific_message_url(self):
         guid = "3690DA00-7DDA-4B72-A847-197715B89D82"

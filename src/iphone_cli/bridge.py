@@ -16,7 +16,14 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .config import DATA_DIR, message_target, receiver_token, receiver_url, sender_socket
+from .config import (
+    DATA_DIR,
+    command_prefix,
+    message_target,
+    receiver_admin_token,
+    receiver_url,
+    sender_socket,
+)
 from .errors import IPhoneError
 
 
@@ -43,8 +50,9 @@ def _read_line(connection: socket.socket, limit: int) -> bytes:
 
 def send_command(command: str) -> None:
     """Ask the per-user sender agent to deliver one private command."""
-    if not command.startswith("hola ") or "\n" in command or "\r" in command:
-        raise IPhoneError("The sender accepts one single-line 'hola' command.")
+    prefix = command_prefix()
+    if not command.startswith(f"{prefix} ") or "\n" in command or "\r" in command:
+        raise IPhoneError(f"The sender accepts one single-line '{prefix}' command.")
     payload = json.dumps({"command": command}, separators=(",", ":")).encode() + b"\n"
     path = sender_socket()
     try:
@@ -107,13 +115,14 @@ def _handle_sender_connection(connection: socket.socket) -> None:
             raise IPhoneError("Sender connection came from another user.")
         request = json.loads(_read_line(connection, MAX_COMMAND_BYTES))
         command = request.get("command") if isinstance(request, dict) else None
+        prefix = command_prefix()
         if (
             not isinstance(command, str)
-            or not command.startswith("hola ")
+            or not command.startswith(f"{prefix} ")
             or "\n" in command
             or "\r" in command
         ):
-            raise IPhoneError("The sender accepts one single-line 'hola' command.")
+            raise IPhoneError(f"The sender accepts one single-line '{prefix}' command.")
         _send_imessage(command)
         response = {"ok": True}
     except (IPhoneError, json.JSONDecodeError, UnicodeDecodeError) as error:
@@ -150,14 +159,14 @@ def run_sender() -> None:
 
 
 def _correlation_id() -> str:
-    return f"{secrets.randbelow(90_000) + 10_000}"
+    return secrets.token_hex(16)
 
 
 def _receiver_request(method: str, path: str) -> bytes | None:
     request = Request(
         receiver_url() + path,
         method=method,
-        headers={"X-Auth": receiver_token()},
+        headers={"X-Admin-Auth": receiver_admin_token()},
     )
     try:
         with urlopen(request, timeout=2) as response:
@@ -168,6 +177,12 @@ def _receiver_request(method: str, path: str) -> bytes | None:
         raise IPhoneError(f"Receiver returned HTTP {error.code} for {path}.") from error
     except URLError as error:
         raise IPhoneError(f"Could not reach the local receiver: {error.reason}") from error
+
+
+def _register_pending(kind: str, request_id: str) -> None:
+    result = _receiver_request("POST", f"/pending/{kind}/{request_id}")
+    if result is None:
+        raise IPhoneError("The local receiver does not support one-time response registration.")
 
 
 def _poll(path: str, timeout: int) -> bytes:
@@ -198,24 +213,24 @@ def _timeout(environment_name: str, default: int) -> int:
 
 def read_screen() -> None:
     request_id = _correlation_id()
-    _receiver_request("DELETE", f"/text/{request_id}")
-    send_command(f"hola screentext {request_id}")
+    _register_pending("text", request_id)
+    send_command(f"{command_prefix()} screentext {request_id}")
     text = _poll(f"/text/{request_id}", _timeout("READ_SCREEN_TIMEOUT", 30))
     sys.stdout.write(text.decode("utf-8"))
 
 
 def read_clipboard() -> None:
     request_id = _correlation_id()
-    _receiver_request("DELETE", f"/clipboard/{request_id}")
-    send_command(f"hola getclipboard {request_id}")
+    _register_pending("clipboard", request_id)
+    send_command(f"{command_prefix()} getclipboard {request_id}")
     value = _poll(f"/clipboard/{request_id}", _timeout("CLIPBOARD_TIMEOUT", 30))
     sys.stdout.buffer.write(value)
 
 
 def read_alarms() -> None:
     request_id = _correlation_id()
-    _receiver_request("DELETE", f"/get-alarm/{request_id}")
-    send_command(f"hola alarm get {request_id}")
+    _register_pending("get-alarm", request_id)
+    send_command(f"{command_prefix()} alarm get {request_id}")
     value = _poll(f"/get-alarm/{request_id}", _timeout("ALARM_TIMEOUT", 30))
     sys.stdout.buffer.write(value)
 
@@ -230,7 +245,8 @@ def capture_screen() -> None:
     for candidate in candidates:
         if candidate.is_file():
             candidate.unlink()
-    send_command(f"hola screenshot {request_id}")
+    _register_pending("photo", request_id)
+    send_command(f"{command_prefix()} screenshot {request_id}")
     deadline = time.monotonic() + _timeout("SCREENSHOT_TIMEOUT", 45)
     while time.monotonic() < deadline:
         for candidate in candidates:
