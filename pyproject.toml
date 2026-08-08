@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-ios-assistant"
-version = "0.1.0"
+version = "0.2.0"
 description = "Control and inspect an iPhone from Codex through iMessage and Shortcuts"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,8 +21,9 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/samin100/codex-ios-assistant"
-Repository = "https://github.com/samin100/codex-ios-assistant"
+Homepage = "https://github.com/VRVV02/codex-ios-assistant"
+Repository = "https://github.com/VRVV02/codex-ios-assistant"
+Upstream = "https://github.com/Samin100/codex-ios-assistant"
 
 [project.scripts]
 iphone = "iphone_cli.cli:main"

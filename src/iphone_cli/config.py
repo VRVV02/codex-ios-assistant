@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .errors import IPhoneError
 
@@ -73,12 +75,53 @@ def receiver_token() -> str:
     return token
 
 
-def public_url() -> str:
-    url = value("IPHONE_PUBLIC_URL", required=True).rstrip("/")
-    if not url.startswith("https://") or "/" in url[len("https://") :]:
+def receiver_admin_token() -> str:
+    token = value("IPHONE_RECEIVER_ADMIN_TOKEN", required=True)
+    if len(token) < 32:
         raise IPhoneError(
-            "IPHONE_PUBLIC_URL must be an HTTPS origin such as "
-            "https://iphone.example.com (without a path)."
+            "IPHONE_RECEIVER_ADMIN_TOKEN must contain at least 32 characters."
+        )
+    return token
+
+
+def command_prefix() -> str:
+    prefix = value("IPHONE_COMMAND_PREFIX") or "ios_command"
+    if not re.fullmatch(r"[A-Za-z0-9_-]{4,64}", prefix):
+        raise IPhoneError(
+            "IPHONE_COMMAND_PREFIX must be 4-64 letters, numbers, hyphens, or underscores."
+        )
+    return prefix
+
+
+def shortcut_receiver_url() -> str:
+    """Return the tailnet-only HTTPS origin embedded in the iPhone Shortcut.
+
+    ``IPHONE_PUBLIC_URL`` remains a read-only compatibility fallback so existing
+    configs fail with a useful host validation error instead of disappearing.
+    """
+    url = (value("IPHONE_RECEIVER_URL") or value("IPHONE_PUBLIC_URL", required=True)).rstrip("/")
+    parsed = urlsplit(url)
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise IPhoneError("IPHONE_RECEIVER_URL contains an invalid port.") from error
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or port is not None
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise IPhoneError(
+            "IPHONE_RECEIVER_URL must be an HTTPS origin without a path."
+        )
+    hostname = parsed.hostname.lower().rstrip(".")
+    if not hostname.endswith(".ts.net"):
+        raise IPhoneError(
+            "IPHONE_RECEIVER_URL must be a private Tailscale HTTPS origin ending in .ts.net."
         )
     return url
 

@@ -15,11 +15,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 from .errors import IPhoneError
-from .config import CONFIG_FILE, file_values, receiver_url, sender_socket
+from .config import CONFIG_FILE, command_prefix, file_values, receiver_url, sender_socket
 
 
 OperationKind = Literal[
-    "hola",
+    "command",
     "screen-read",
     "screen-capture",
     "clipboard-read",
@@ -60,10 +60,10 @@ def command_from_environment(name: str, default: str | list[str]) -> list[str]:
 
 
 def command_for(operation: Operation) -> list[str]:
-    if operation.kind == "hola":
+    if operation.kind == "command":
         return [
             *command_from_environment("IPHONE_IMSG_COMMAND", bridge_command("send")),
-            "hola",
+            command_prefix(),
             *operation.arguments,
         ]
     if operation.kind == "screen-read":
@@ -139,7 +139,7 @@ def execute(
     environment["ALARM_TIMEOUT"] = str(max(1, int(timeout)))
     stdout = _run(command, timeout=timeout + 5, environment=environment)
 
-    if operation.kind == "hola":
+    if operation.kind == "command":
         # The legacy bridge acknowledges that Messages accepted the command,
         # but it does not yet return a phone-side execution receipt.
         return Result(
@@ -223,8 +223,10 @@ def dependency_report() -> list[dict[str, object]]:
     configured = file_values()
     required_names = (
         "IPHONE_MSG_TARGET",
-        "IPHONE_PUBLIC_URL",
+        "IPHONE_RECEIVER_URL",
         "IPHONE_RECEIVER_TOKEN",
+        "IPHONE_RECEIVER_ADMIN_TOKEN",
+        "IPHONE_COMMAND_PREFIX",
     )
     configuration_ready = CONFIG_FILE.is_file() and all(
         os.environ.get(name, configured.get(name, "")).strip() for name in required_names

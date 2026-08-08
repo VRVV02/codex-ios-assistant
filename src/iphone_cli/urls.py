@@ -45,6 +45,17 @@ def normalize_open_url(value: str) -> str:
 
     parsed = urlsplit(value)
     if parsed.scheme:
+        if parsed.scheme.lower() not in {"https", "http"}:
+            raise IPhoneError(
+                "Generic URL opening permits only HTTP(S). Use a dedicated iphone app command "
+                "for native deep links."
+            )
+        if not parsed.netloc or not parsed.hostname or parsed.username is not None:
+            raise IPhoneError(f"Expected a complete HTTP(S) URL, got: {value!r}")
+        try:
+            parsed.port
+        except ValueError as error:
+            raise IPhoneError(f"Invalid port in URL: {value!r}") from error
         return value
 
     candidate = f"https://{value}"
@@ -170,7 +181,7 @@ def messages_compose_url(address: str, body: str) -> str:
     return (
         "sms://open?"
         f"address={quote(address, safe='')}&"
-        f"body={quote(body, safe='')}&sendImmediately=true"
+        f"body={quote(body, safe='')}"
     )
 
 
@@ -186,7 +197,7 @@ def messages_group_compose_url(group_id: str, body: str) -> str:
     return (
         "sms://open?"
         f"groupid={group_id.upper()}&"
-        f"body={quote(body, safe='')}&sendImmediately=true"
+        f"body={quote(body, safe='')}"
     )
 
 

@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""Expose the loopback receiver only inside the user's Tailscale network."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import shutil
+import subprocess
+
+
+REPO = Path(__file__).resolve().parents[1]
+
+
+def tailscale_binary() -> str:
+    candidates = [
+        shutil.which("tailscale"),
+        "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file():
+            return candidate
+    raise SystemExit(
+        "Tailscale is not installed. Install it on this Mac and iPhone, sign both into "
+        "the same tailnet, then rerun this script."
+    )
+
+
+def main() -> int:
+    tailscale = tailscale_binary()
+    result = subprocess.run(
+        [tailscale, "status", "--json"], capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0:
+        raise SystemExit(result.stderr.strip() or "Tailscale is not running or signed in.")
+    try:
+        status = json.loads(result.stdout)
+        hostname = status["Self"]["DNSName"].rstrip(".")
+    except (KeyError, TypeError, json.JSONDecodeError) as error:
+        raise SystemExit("Could not discover this Mac's Tailscale DNS name.") from error
+    if status.get("BackendState") != "Running" or not hostname.endswith(".ts.net"):
+        raise SystemExit("Tailscale must be connected with MagicDNS enabled.")
+
+    subprocess.run(
+        [tailscale, "serve", "--bg", "8787"], check=True
+    )
+    origin = f"https://{hostname}"
+    subprocess.run([str(REPO / "scripts" / "configure"), "--url", origin], check=True)
+    print(f"Private receiver origin: {origin}")
+    print("Tailscale Serve is tailnet-only. Do not enable Funnel for this service.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

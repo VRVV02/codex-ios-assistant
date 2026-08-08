@@ -1,72 +1,64 @@
 # Architecture and protocol
 
-The Mac sends commands through iMessage. The iPhone returns data through HTTPS.
+## Command path
 
-## Components
+1. Codex invokes the typed `iphone` CLI.
+2. The CLI validates arguments and builds either a dedicated deep link or a
+   native Shortcut operation.
+3. A mode-`0600` Unix socket hands one bounded command to the per-user sender.
+4. Messages sends the command to the user's own iMessage address.
+5. The iPhone automation matches both the configured sender and a random
+   per-install prefix, then runs the 95-action Shortcut.
 
-1. The `iphone` CLI validates arguments and builds either an Apple URL or a Shortcut command.
-2. The `iphone-control` skill tells Codex which CLI command to use and how to interpret its result.
-3. A per-user LaunchAgent accepts commands on a Unix socket and automates Messages in the macOS GUI session.
-4. A Message automation on the iPhone runs the 95-action Shortcut for messages that match `hola`.
-5. The Shortcut runs an iOS action. Branches that produce data post to `/text`, `/photo`, `/clipboard`, or `/get-alarm`.
-6. A named Cloudflare Tunnel sends requests for the public hostname to the receiver on `127.0.0.1:8787`.
-7. The CLI polls the local receiver for text data or watches the private inbox for a screenshot until it gets a response or reaches the timeout.
-
-## Command format
-
-The sender accepts one line beginning with `hola `:
+The wire grammar uses the generated prefix shown by `scripts/show-trigger`:
 
 ```text
-hola openurl <url>
-hola homescreen
-hola screenshot <id>
-hola screentext <id>
-hola getclipboard <id>
-hola copytoclipboard <text>
-hola alarm get <id>
-hola alarm set <HH:MM> <label>
-hola alarm off <HH:MM>
-hola timer start <seconds>
-hola timer pause
-hola timer resume
-hola timer cancel
-hola flashlight on|off
-hola lowpower on|off
-hola controlcenter open|close
-hola call <phone>
+<prefix> openurl <validated URL>
+<prefix> homescreen
+<prefix> screenshot <128-bit-id>
+<prefix> screentext <128-bit-id>
+<prefix> getclipboard <128-bit-id>
+<prefix> copytoclipboard <text>
+<prefix> alarm get <128-bit-id>
+<prefix> alarm set <HH:MM> <label>
+<prefix> alarm off <HH:MM>
+<prefix> timer start <seconds>
+<prefix> timer pause|resume|cancel
+<prefix> flashlight on|off
+<prefix> lowpower on|off
+<prefix> controlcenter open|close
+<prefix> call <phone>
 ```
 
-Use the CLI rather than writing these messages yourself. The CLI checks times, phone numbers, URLs, and durations. The sender enforces the command size and line format.
+The sender accepts one line up to 4 KiB and never accepts a caller-selected
+program or AppleScript.
 
-## Response format
+## Private response path
 
-Data endpoints require the receiver token in `X-Auth`. The Shortcut puts the request ID in `X-Screenshot-Id`, a header name retained for compatibility with the original screenshot branch.
+1. Before a read command is sent, the Mac registers the expected response kind
+   and a random 128-bit ID on the local receiver with `X-Admin-Auth`.
+2. The Shortcut performs the native read and POSTs it with the matching ID and
+   `X-Auth` write token.
+3. Tailscale Serve carries the HTTPS callback inside the tailnet to the receiver
+   bound on `127.0.0.1:8787`.
+4. The receiver rejects unknown, expired, mismatched, or already-used IDs.
+5. The Mac consumes text responses once with the admin token. Screenshots are
+   written mode `0600` into the private inbox and expire through retention cleanup.
 
-| Command | Shortcut request | CLI wait |
+| Request | iPhone response | Mac behavior |
 | --- | --- | --- |
-| `hola screentext <id>` | JSON to `POST /text` | Poll `GET /text/<id>` every 0.5 seconds for up to 30 seconds |
-| `hola screenshot <id>` | Image to `POST /photo` | Watch the private inbox for up to 45 seconds |
-| `hola getclipboard <id>` | Text or JSON to `POST /clipboard` | Poll `GET /clipboard/<id>` for up to 30 seconds |
-| `hola alarm get <id>` | Alarm data to `POST /get-alarm` | Poll `GET /get-alarm/<id>` for up to 30 seconds |
+| `screentext` | JSON to `POST /text` | one-time `GET /text/<id>` |
+| `screenshot` | image to `POST /photo` | watch private inbox |
+| `getclipboard` | text/JSON to `POST /clipboard` | one-time `GET /clipboard/<id>` |
+| `alarm get` | alarm data to `POST /get-alarm` | one-time `GET /get-alarm/<id>` |
 
-The receiver keeps up to 200 screen, clipboard, and alarm responses in memory. It saves screenshots under `~/.local/share/codex-ios-assistant/inbox/`. Restarting the receiver clears the in-memory values.
+The Shortcut knows only the phone-write token. It cannot register requests or
+read stored responses. The admin token remains on the Mac.
 
-## CLI status values
+## URL boundary
 
-- `dry-run`: the CLI printed the command without sending it.
-- `requested`: Messages accepted the command. The phone did not return a receipt.
-- `completed`: the phone returned matching data, or a Mac-side read finished.
-- `failed`: a required service is missing or a helper returned an error.
+Generic URL opening accepts only HTTP(S). Supported app deep links are built by
+dedicated validators in `src/iphone_cli/urls.py`; arbitrary native schemes such
+as `shortcuts://` are rejected. Message composition creates an unsent draft.
 
-A `requested` result confirms delivery to Messages, not execution on iOS. One-way actions do not post acknowledgements.
-
-## Messages sender
-
-Sandboxed AppleScript can fail with `Unable to find application named 'Messages'` or an `LSCopyApplicationURLsForBundleIdentifier()` error. The sender LaunchAgent runs in the user's GUI domain, so it can resolve and automate Messages. Codex reaches it through a local socket.
-
-The sender accepts a narrow input:
-
-- The socket has mode `0600`.
-- The sender checks the peer UID when macOS exposes it.
-- Each request contains one `hola` line, with a 4 KiB limit and no newline.
-- The sender calls a fixed `/usr/bin/osascript` program. The client cannot supply an executable or script.
+See [Security](security.md) for residual risks and operational guidance.

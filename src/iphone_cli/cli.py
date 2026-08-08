@@ -149,7 +149,7 @@ def _open_operation(resource: str, url: str, summary: str, **metadata: object) -
     return Operation(
         resource=resource,
         action="open",
-        kind="hola",
+        kind="command",
         arguments=("openurl", url),
         summary=summary,
         url=url,
@@ -277,7 +277,7 @@ def _handle_messages_compose(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="messages",
         action="compose",
-        kind="hola",
+        kind="command",
         arguments=("openurl", url),
         summary=summary,
         url=url,
@@ -423,7 +423,7 @@ def _handle_home(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="home",
         action="show",
-        kind="hola",
+        kind="command",
         arguments=("homescreen",),
         summary="Home Screen shown.",
     )
@@ -434,7 +434,7 @@ def _handle_flashlight(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="flashlight",
         action=args.state,
-        kind="hola",
+        kind="command",
         arguments=("flashlight", args.state),
         summary=f"Flashlight {action}.",
     )
@@ -445,7 +445,7 @@ def _handle_timer_start(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="timer",
         action="start",
-        kind="hola",
+        kind="command",
         arguments=("timer", "start", str(seconds)),
         summary=f"Timer started for {seconds} seconds.",
         metadata={"seconds": seconds},
@@ -458,7 +458,7 @@ def _handle_timer_control(action: str) -> Handler:
         return Operation(
             resource="timer",
             action=action,
-            kind="hola",
+            kind="command",
             arguments=("timer", action),
             summary=f"Timer {past_tense}.",
         )
@@ -477,7 +477,7 @@ def _handle_alarm_set(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="alarm",
         action="set",
-        kind="hola",
+        kind="command",
         arguments=("alarm", "set", args.time, label),
         summary=f"Alarm requested for {_display_alarm_time(args.time)}.",
         metadata={"time": args.time, "label": label},
@@ -488,7 +488,7 @@ def _handle_alarm_off(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="alarm",
         action="off",
-        kind="hola",
+        kind="command",
         arguments=("alarm", "off", args.time),
         summary=f"Alarm-off requested for {_display_alarm_time(args.time)}.",
         metadata={"time": args.time},
@@ -500,7 +500,7 @@ def _handle_call(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="call",
         action="call",
-        kind="hola",
+        kind="command",
         arguments=("call", phone),
         summary=f"Call placed to {args.recipient}.",
         metadata={"recipient": args.recipient, "phone": phone},
@@ -512,7 +512,7 @@ def _handle_clipboard_copy(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="clipboard",
         action="copy",
-        kind="hola",
+        kind="command",
         arguments=("copytoclipboard", text),
         summary="Clipboard updated.",
         metadata={"text": text},
@@ -528,7 +528,7 @@ def _handle_low_power(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="low-power",
         action=args.state,
-        kind="hola",
+        kind="command",
         arguments=("lowpower", args.state),
         summary=f"Low Power Mode {action}.",
     )
@@ -539,7 +539,7 @@ def _handle_control_center(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="control-center",
         action=args.state,
-        kind="hola",
+        kind="command",
         arguments=("controlcenter", args.state),
         summary=f"Control Center {action}.",
     )

@@ -12,11 +12,12 @@ import sys
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
-from iphone_cli.config import public_url, receiver_token  # noqa: E402
+from iphone_cli.config import command_prefix, receiver_token, shortcut_receiver_url  # noqa: E402
 
 
-PUBLIC_PLACEHOLDER = "__IOS_ASSISTANT_PUBLIC_URL__"
+RECEIVER_URL_PLACEHOLDER = "__IOS_ASSISTANT_RECEIVER_URL__"
 TOKEN_PLACEHOLDER = "__IOS_ASSISTANT_RECEIVER_TOKEN__"
+COMMAND_PREFIX_PLACEHOLDER = "__IOS_ASSISTANT_COMMAND_PREFIX__"
 
 
 def replace(value: object, substitutions: dict[str, str], counts: dict[str, int]) -> object:
@@ -40,12 +41,17 @@ def main() -> int:
     destination = REPO / "build" / "ios-assistant-actions.plist"
     with template.open("rb") as source:
         actions = plistlib.load(source)
-    counts = {PUBLIC_PLACEHOLDER: 0, TOKEN_PLACEHOLDER: 0}
+    counts = {
+        RECEIVER_URL_PLACEHOLDER: 0,
+        TOKEN_PLACEHOLDER: 0,
+        COMMAND_PREFIX_PLACEHOLDER: 0,
+    }
     rendered = replace(
         actions,
         {
-            PUBLIC_PLACEHOLDER: public_url(),
+            RECEIVER_URL_PLACEHOLDER: shortcut_receiver_url(),
             TOKEN_PLACEHOLDER: receiver_token(),
+            COMMAND_PREFIX_PLACEHOLDER: command_prefix(),
         },
         counts,
     )

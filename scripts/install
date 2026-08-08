@@ -37,16 +37,12 @@ else
   print -u2 "Install Xcode Command Line Tools with: xcode-select --install"
 fi
 
-if [[ ! -f "$HOME/.config/codex-ios-assistant/config.env" ]]; then
-  "$repo_dir/scripts/configure"
-fi
-
 print "Installed iphone CLI: $local_bin/iphone"
 print "Installed Codex skill: $user_skills/iphone-control"
-if ! command -v cloudflared >/dev/null 2>&1; then
-  print "Next dependency: brew install cloudflared"
+if ! command -v tailscale >/dev/null 2>&1 && [[ ! -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ]]; then
+  print "Next dependency: install Tailscale on this Mac and iPhone"
 fi
 if ! command -v imsg >/dev/null 2>&1; then
   print "Optional Messages history: brew install steipete/tap/imsg"
 fi
-print "Next: run ./scripts/setup-cloudflare, make shortcut, and make services."
+print "Next: run ./scripts/setup-tailscale, install services, and make the Shortcut."
